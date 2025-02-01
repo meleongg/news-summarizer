@@ -1,0 +1,12 @@
+# Ignore Python environment and cache files
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Ignore API keys
+.env
+
+# Ignore Streamlit cache
+.ui/streamlit_cache/
