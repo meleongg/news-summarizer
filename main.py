@@ -18,6 +18,7 @@ sentiment_analyzer = SentimentIntensityAnalyzer()
 
 @app.get("/fetch_news/")
 def fetch_news(query: str):
+    print("Fetching news")
     """Fetch news articles based on a search phrase"""
     url = f"https://newsapi.org/v2/everything?q={query}&apiKey={NEWS_API_KEY}"
     response = requests.get(url)
@@ -31,6 +32,7 @@ def fetch_news(query: str):
 @app.get("/analyze/")
 def analyze_article(url: str):
     """Extract, summarize, and analyze sentiment of an article"""
+    print("Analyzing url")
     try:
         # Extract article text
         article = Article(url)
