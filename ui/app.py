@@ -7,11 +7,28 @@ if "selected_url" not in st.session_state:
     st.session_state.selected_url = None
 
 query = st.text_input("Enter a topic or keyword to analyze:")
+sort_by = st.selectbox("Sort articles by:", ["Relevancy", "Popularity", "Publish Date"])
+page_size = st.selectbox("Number of articles to show:", [5, 10, 15, 20])
 
 if st.button("Search News"):
+    loading_text = st.empty()  # Placeholder for "Loading..."
+    loading_text.text("Searching for articles... Please wait ⏳")  # Show loading message
+
     if query:
-        response = requests.get("http://127.0.0.1:8000/fetch_news/", params={"query": query})
+        sort_map = {
+          "Relevancy": "relevancy",
+          "Popularity": "popularity",
+          "Publish Date": "publishedAt"
+        }
+        sort_by = sort_map[sort_by]
+
+        response = requests.get(
+            f"http://127.0.0.1:8000/fetch_news/",
+            params={"query": query, "sort_by": sort_by, "page_size": page_size}
+        )
+
         if response.status_code == 200:
+            loading_text.empty()
             articles = response.json()
             if articles:
                 st.session_state.articles = articles
@@ -19,11 +36,12 @@ if st.button("Search News"):
             else:
                 st.warning("No articles found.")
         else:
+            loading_text.empty()
             st.error("Failed to fetch news. Check your API key.")
 
 if "articles" in st.session_state and st.session_state.articles:
     selected_title = st.selectbox(
-        "Choose an article:", 
+        "Choose an article:",
         [a["title"] for a in st.session_state.articles],
         key="article_select"
     )

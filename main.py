@@ -6,6 +6,14 @@ from newspaper import Article
 from transformers import pipeline
 from nltk.sentiment import SentimentIntensityAnalyzer
 
+# URL validation function
+def validate_url(url: str) -> bool:
+    try:
+        response = requests.head(url, allow_redirects=True)
+        return response.status_code == 200
+    except requests.exceptions.RequestException:
+        return False
+
 # Load API key
 load_dotenv()
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
@@ -17,22 +25,36 @@ summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 sentiment_analyzer = SentimentIntensityAnalyzer()
 
 @app.get("/fetch_news/")
-def fetch_news(query: str):
-    print("Fetching news")
-    """Fetch news articles based on a search phrase"""
-    url = f"https://newsapi.org/v2/everything?q={query}&apiKey={NEWS_API_KEY}"
+def fetch_news(query: str, sort_by: str = "relevancy", page_size: int = 10):
+    """Fetch news articles based on a search phrase with sorting and pagination"""
+    # Start by fetching a larger batch (e.g., 50 articles)
+    extra_page_size = 50
+    url = f"https://newsapi.org/v2/everything?q={query}&apiKey={NEWS_API_KEY}&sortBy={sort_by}&pageSize={extra_page_size}"
     response = requests.get(url)
 
     if response.status_code != 200:
         raise HTTPException(status_code=500, detail="Failed to fetch news")
 
     articles = response.json().get("articles", [])
-    return [{"title": a["title"], "url": a["url"]} for a in articles]
+
+    # Validate URLs and filter out invalid ones
+    valid_articles = [{"title": a["title"], "url": a["url"], "source": a["source"]["name"]} for a in articles if validate_url(a["url"])]
+
+    # If not enough valid articles, fetch more (if possible)
+    while len(valid_articles) < page_size and len(articles) < extra_page_size:
+        # Fetch more if needed, adjusting the query or page number
+        response = requests.get(url)  # You can modify URL here to fetch the next batch
+        if response.status_code != 200:
+            break
+        articles = response.json().get("articles", [])
+        valid_articles.extend([{"title": a["title"], "url": a["url"], "source": a["source"]["name"]} for a in articles if validate_url(a["url"])])
+
+    # Return only up to page_size number of articles
+    return valid_articles[:page_size]
 
 @app.get("/analyze/")
 def analyze_article(url: str):
     """Extract, summarize, and analyze sentiment of an article"""
-    print("Analyzing url")
     try:
         # Extract article text
         article = Article(url)
@@ -49,7 +71,6 @@ def analyze_article(url: str):
 
         return {
             "title": article.title,
-            "text": text,
             "summary": summary,
             "sentiment": sentiment_label
         }
